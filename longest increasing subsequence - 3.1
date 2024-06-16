@@ -1,0 +1,22 @@
+def find_longest_increasing_subsequence(arr, value_list=None):
+    if value_list is None:
+        value_list = [-1] * len(arr)
+
+    if len(arr) <= 1:
+        return len(arr)
+
+    max_len = 0
+    for j in range(len(arr) - 1):
+        if value_list[j] == -1:
+            value_list[j] = find_longest_increasing_subsequence(arr[:j + 1], value_list[:j + 1])
+        if arr[j] < arr[-1]:
+            max_len = max(max_len, value_list[j])
+
+    result = max(value_list[-2] if len(arr) > 1 else 0, max_len + 1)
+
+    value_list[-1] = result
+    return result
+
+
+arr = [3, 5, 3, 1, 4]
+print(find_longest_increasing_subsequence(arr))
