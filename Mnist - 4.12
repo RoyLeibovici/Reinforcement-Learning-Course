@@ -3,7 +3,6 @@ import torch.nn as nn
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
 from torch.autograd import Variable
-from sklearn.model_selection import train_test_split
 
 
 # Hyper Parameters
@@ -14,15 +13,10 @@ batch_size = 1024
 learning_rate = 0.01
 
 # MNIST Dataset
-full_train_dataset = dsets.MNIST(root='./data',
-                                 train=True,
-                                 transform=transforms.ToTensor(),
-                                 download=True)
-
-# Split into training and validation datasets
-train_size = int(0.85 * len(full_train_dataset))
-validation_size = len(full_train_dataset) - train_size
-train_dataset, validation_dataset = torch.utils.data.random_split(full_train_dataset, [train_size, validation_size])
+train_dataset = dsets.MNIST(root='./data',
+                            train=True,
+                            transform=transforms.ToTensor(),
+                            download=True)
 
 test_dataset = dsets.MNIST(root='./data',
                            train=False,
@@ -33,13 +27,10 @@ train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                            batch_size=batch_size,
                                            shuffle=True)
 
-validation_loader = torch.utils.data.DataLoader(dataset=validation_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=False)
-
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                           batch_size=batch_size,
                                           shuffle=False)
+
 # Neural Network Model
 class Net(nn.Module):
     def __init__(self, input_size, num_classes):
