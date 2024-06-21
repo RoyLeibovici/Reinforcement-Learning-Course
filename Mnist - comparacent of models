@@ -1,0 +1,199 @@
+import torch
+import torch.nn as nn
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+from torch.autograd import Variable
+import matplotlib.pyplot as plt
+
+# MNIST Dataset
+train_dataset = dsets.MNIST(root='./data',
+                            train=True,
+                            transform=transforms.ToTensor(),
+                            download=True)
+
+test_dataset = dsets.MNIST(root='./data',
+                           train=False,
+                           transform=transforms.ToTensor())
+
+# Hyper Parameters
+input_size = 784
+num_classes = 10
+hidden_size = 500
+
+# Data Loader (Input Pipeline)
+batch_size_1 = 100
+batch_size_2 = 1024
+train_loader_1 = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size_1, shuffle=True)
+test_loader_1 = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size_1, shuffle=False)
+train_loader_2 = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size_2, shuffle=True)
+test_loader_2 = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size_2, shuffle=False)
+
+
+def train_and_evaluate(model, criterion, optimizer, num_epochs, train_loader, test_loader):
+    train_accuracies = []
+    test_accuracies = []
+    train_losses = []
+
+    for epoch in range(num_epochs):
+        model.train()
+        epoch_loss = 0
+        for images, labels in train_loader:
+            images = images.view(-1, 28 * 28)
+            images, labels = Variable(images), Variable(labels)
+
+            # Forward + Backward + Optimize
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Accumulate loss
+            epoch_loss += loss.item()
+
+        # Calculate average loss for the epoch
+        epoch_loss /= len(train_loader)
+        train_losses.append(epoch_loss)
+
+        # Evaluate on training data
+        train_accuracy = evaluate(model, train_loader)
+        train_accuracies.append(train_accuracy)
+
+        # Evaluate on test data
+        test_accuracy = evaluate(model, test_loader)
+        test_accuracies.append(test_accuracy)
+
+        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%, Test Accuracy: {test_accuracy:.2f}%')
+
+    return train_accuracies, test_accuracies, train_losses
+
+def evaluate(model, data_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in data_loader:
+            images = images.view(-1, 28 * 28)
+            images, labels = Variable(images), Variable(labels)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    accuracy = 100 * correct / total
+    return accuracy
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim() > 2:
+            input = input.view(input.size(0), input.size(1), -1)
+            input = input.transpose(1, 2)
+            input = input.contiguous().view(-1, input.size(2))
+        target = target.view(-1, 1)
+
+        logpt = torch.log_softmax(input, dim=1)
+        logpt = logpt.gather(1, target)
+        logpt = logpt.view(-1)
+        pt = logpt.exp()
+
+        if self.alpha is not None:
+            if self.alpha.type() != input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0, target.data.view(-1))
+            logpt = logpt * at
+
+        loss = -1 * (1 - pt) ** self.gamma * logpt
+        if self.size_average:
+            return loss.mean()
+        else:
+            return loss.sum()
+
+
+class Net1(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(Net1, self).__init__()
+        self.fc1 = nn.Linear(input_size, num_classes)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        return out
+
+net1 = Net1(input_size, num_classes)
+criterion1 = nn.CrossEntropyLoss()
+optimizer1 = torch.optim.SGD(net1.parameters(), lr=1e-3)
+train_accuracies1, test_accuracies1, train_losses1 = train_and_evaluate(net1, criterion1, optimizer1, 100, train_loader_1, test_loader_1)
+
+
+class Net2(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(Net2, self).__init__()
+        self.fc1 = nn.Linear(input_size, num_classes)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        return out
+
+net2 = Net2(input_size, num_classes)
+criterion2 = FocalLoss()
+optimizer2 = torch.optim.Adam(net2.parameters(), lr=0.01)
+train_accuracies2, test_accuracies2, train_losses2 = train_and_evaluate(net2, criterion2, optimizer2, 100, train_loader_2, test_loader_2)
+
+
+class Net3(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes):
+        super(Net3, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+
+net3 = Net3(input_size, hidden_size, num_classes)
+criterion3 = FocalLoss()
+optimizer3 = torch.optim.Adam(net3.parameters(), lr=0.01)
+train_accuracies3, test_accuracies3, train_losses3 = train_and_evaluate(net3, criterion3, optimizer3, 100, train_loader_2, test_loader_2)
+
+
+# Function to plot accuracies
+def plot_accuracies(train_accuracies, test_accuracies, labels):
+    epochs = range(1, len(train_accuracies[0]) + 1)
+    plt.figure(figsize=(10, 5))
+    for i, (train_acc, test_acc) in enumerate(zip(train_accuracies, test_accuracies)):
+        plt.plot(epochs, train_acc, label=f'{labels[i]} Train')
+        plt.plot(epochs, test_acc, label=f'{labels[i]} Test')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy %')
+    plt.legend()
+    plt.title('Model Accuracy Comparison')
+    plt.show()
+
+# Function to plot losses
+def plot_losses(train_losses, labels):
+    plt.figure(figsize=(10, 5))
+    for i, losses in enumerate(train_losses):
+        plt.plot(losses, label=f'{labels[i]} Train')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Average loss per epoch by model')
+    plt.show()
+
+plot_accuracies(
+    [train_accuracies1, train_accuracies2, train_accuracies3],
+    [test_accuracies1, test_accuracies2, test_accuracies3],
+    ['Model 1', 'Model 2', 'Model 3']
+)
+
+plot_losses(
+    [train_losses1, train_losses2, train_losses3],
+    ['Model 1', 'Model 2', 'Model 3']
+)
