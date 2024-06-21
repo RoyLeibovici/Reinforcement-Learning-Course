@@ -1,0 +1,52 @@
+def most_probable_word(n):
+    # Probability transition matrix using tuples as keys
+    P = {
+        ('B', 'B'): 0.1, ('B', 'K'): 0.325, ('B', 'O'): 0.25, ('B', '-'): 0.325,
+        ('K', 'B'): 0.4, ('K', 'K'): 0.0, ('K', 'O'): 0.4, ('K', '-'): 0.2,
+        ('O', 'B'): 0.2, ('O', 'K'): 0.2, ('O', 'O'): 0.2, ('O', '-'): 0.4,
+        ('-', 'B'): 1, ('-', 'K'): 0, ('-', 'O'): 0, ('-', '-'): 0
+    }
+
+    # Possible letters in the words
+    letters = ['B', 'K', 'O']
+
+    # Initialize the probabilities for words of length 1
+    max_probs = {('B', 1): 1, ('K', 1): 0, ('O', 1): 0}
+    max_prev_letters = {}  # For backtracking
+
+    # Calculate max_probs[(letter, i)] for every letter and length combination
+    for i in range(2, n + 1):
+        for letter in letters:
+            max_prob = 0
+            max_prev_letter = ''
+            for prev_letter in letters:
+                # Calculate the probability of transitioning from prev_letter to letter
+                letter_prob = max_probs[(prev_letter, i - 1)] * P[(prev_letter, letter)]
+                if letter_prob > max_prob:
+                    max_prob = letter_prob
+                    max_prev_letter = prev_letter
+            # Store the highest probability and the corresponding previous letter
+            max_probs[(letter, i)] = max_prob
+            max_prev_letters[(letter, i)] = max_prev_letter
+
+    # Add end character ('-') to finalize the word
+    max_prob = 0
+    last_letter = ''
+    for letter in letters:
+        letter_prob = max_probs[(letter, n)] * P[(letter, '-')]
+        if letter_prob > max_prob:
+            max_prob = letter_prob
+            last_letter = letter
+
+    # Backtrack to find the most probable word
+    current_letter = last_letter
+    word = current_letter
+    for i in reversed(range(2, n + 1)):
+        current_letter = max_prev_letters[(current_letter, i)]
+        word += current_letter
+
+    # returns probability and the word itself
+    return max_prob, word[::-1]
+
+
+print(most_probable_word(5))
