@@ -1,0 +1,70 @@
+! pip install gymnasium
+import gymnasium as gym
+import numpy as np
+import matplotlib.pyplot as plt
+
+class CPAgent:
+    def __init__(self):
+        self.weights = np.random.uniform(low=-1, high=1, size=(4,))
+
+    def get_action(self, observation):
+        return 1 if np.dot(observation, self.weights) >= 0 else 0
+
+    def randomize_weights(self):
+        self.weights = np.random.uniform(low=-1, high=1, size=(4,))
+
+# Function to run an episode
+def run_episode(env, agent):
+    observation, info = env.reset(seed=42)
+    score = 0
+    for _ in range(200):
+        action = agent.get_action(observation)
+        observation, reward, terminated, truncated, info = env.step(action)
+        score += reward
+        if terminated or truncated:
+            break
+    return score
+
+def random_search_until_200(env):
+    num_episodes = 0
+    while True:
+        agent = CPAgent()
+        score = run_episode(env, agent)
+        num_episodes += 1
+        if score >= 200:
+            break
+    return num_episodes
+
+# Execute the training process
+env = gym.make('CartPole-v1')
+score_dict = random_search(env, num_episodes=10000)
+
+# Find the key (weights) with the maximum score
+max_score_key = max(score_dict, key=score_dict.get)
+max_score = score_dict[max_score_key]
+
+# Print the weights with the maximum score and the corresponding score
+print(f"Weights with maximum score: {max_score_key}")
+print(f"Maximum score: {max_score}")
+
+num_searches = 1000
+episodes_required = []
+
+for _ in range(num_searches):
+    episodes = random_search_until_200(env)
+    episodes_required.append(episodes)
+
+# Calculate the average number of episodes
+average_episodes = np.mean(episodes_required)
+
+# Plot the histogram of the number of episodes required
+plt.hist(episodes_required, bins=20, edgecolor='black')
+plt.xlabel('Number of Episodes')
+plt.ylabel('Frequency')
+plt.title('Histogram of Episodes Required to Reach Score 200')
+plt.show()
+
+# Report the average number of episodes
+print(f"Average number of episodes required to reach a score of 200: {average_episodes:.2f}")
+
+env.close()
