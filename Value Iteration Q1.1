@@ -1,6 +1,6 @@
 ##################################
 # Create env
-#! pip install gymnasium
+#!pip install gymnasium
 import gymnasium as gym
 env = gym.make('FrozenLake-v1')
 env = env.env
@@ -71,15 +71,13 @@ def value_iteration(mdp, gamma, nIt):
 
     len(value_functions) == nIt+1 and len(policies) == nIt
     """
-    print("eta mdp p", mdp.P)
     print("Iteration | max|V-Vprev| | # chg actions | V[0]")
     print("----------+--------------+---------------+---------")
-    Vs = [np.zeros((nS, 1)) for _ in range(nIt)] # list of value functions contains the initial value function V^{(0)}, which is zero
+    Vs = [np.zeros(mdp.nS)] # list of value functions contains the initial value function V^{(0)}, which is zero
     pis = []
     for it in range(nIt):
         oldpi = pis[-1] if len(pis) > 0 else None # \pi^{(it)} = Greedy[V^{(it-1)}]. Just used for printout
         Vprev = Vs[-1] # V^{(it)}
-
         # Your code should fill in meaningful values for the following two variables
         # pi: greedy policy for Vprev (not V),
         #     corresponding to the math above: \pi^{(it)} = Greedy[V^{(it)}]
@@ -87,22 +85,24 @@ def value_iteration(mdp, gamma, nIt):
         # V: bellman backup on Vprev
         #     corresponding to the math above: V^{(it+1)} = T[V^{(it)}]
         #     ** numpy array of floats **
-        Vprevcopy = Vprev.copy()
-        V = np.zeros(mdp.nS)
-        possible_values = []
-        for state in range(mdp.nS):
-            value_per_action = 0
-            for action in range(mdp.nA):
-              for option in mdp.P[state][action]:
-                  probability, neighbor, reward = option
-                  #print("zdec", probability, neighbor, reward)
-                  #print("marker", mdp.P[state][action])
-                  value_per_action += probability * (reward + gamma * Vprevcopy[neighbor])
-              possible_values.append(value_per_action)
-            max_value = max(possible_values)
-            V[state] = max_value
 
-        pi = oldpi # REPLACE THIS LINE WITH YOUR CODE
+        Vprevcopy = Vprev.copy() #Copy to avoid overriding
+        V = np.zeros(mdp.nS)
+        pi = np.zeros(mdp.nS)
+        for state in range(mdp.nS):
+            possible_values = []
+            for action in range(mdp.nA):
+              value_per_action = 0
+              for option in mdp.P[state][action]: #Stochastic MDP has a probability of leading to different states per action
+                  probability, next_state, reward = option
+                  value_per_action += probability * (reward + gamma * Vprevcopy[next_state])
+
+              possible_values.append(value_per_action) 
+
+            max_value = max(possible_values) # Value calculated using the Bellman equations
+            best_action = possible_values.index(max_value) #Policy is greedy w.r.t V(s)
+            V[state] = max_value
+            pi[state] = best_action
 
         max_diff = np.abs(V - Vprev).max()
         nChgActions="N/A" if oldpi is None else (pi != oldpi).sum()
@@ -139,3 +139,18 @@ for (V, pi) in zip(Vs_VI[:10], pis_VI[:10]):
                      color='g', size=12,  verticalalignment='center',
                      horizontalalignment='center', fontweight='bold')
     plt.grid(color='b', lw=2, ls='-')
+
+
+#Plot the value for each state as a function of iteration
+num_iterations = len(Vs_VI) - 1  
+plt.figure(figsize=(12, 8))
+
+for i in range(16):
+    values = [Vs_VI[j][i] for j in range(num_iterations + 1)]
+    plt.plot(values, label=f"State {i}")
+
+plt.legend()
+plt.xlabel("Iterations")
+plt.ylabel("Value")
+plt.title("Value Iteration Progress for Each State")
+plt.show()
