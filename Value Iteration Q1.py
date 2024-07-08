@@ -1,6 +1,6 @@
 ##################################
 # Create env
-#!pip install gymnasium
+!pip install gymnasium
 import gymnasium as gym
 env = gym.make('FrozenLake-v1')
 env = env.env
