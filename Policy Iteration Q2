@@ -1,6 +1,6 @@
 ##################################
 # Create env
-#!pip install gymnasium
+!pip install gymnasium
 import gymnasium as gym
 env = gym.make('FrozenLake-v1')
 env = env.env
@@ -69,7 +69,7 @@ def compute_vpi(pi, mdp, gamma):
       action = pi[state]
       for option in mdp.P[state][action]:
          probability, next_state, reward = option
-         Weighted_Rewards[next_state] += probability  * reward 
+         Weighted_Rewards[next_state] += probability  * reward
          Probability[state][next_state] += probability
     V = np.linalg.solve((np.identity(mdp.nS) - gamma * Probability), Weighted_Rewards)
     return V
@@ -95,8 +95,8 @@ def compute_qpi(vpi, mdp, gamma):
         Weighted_Value = 0
         for option in mdp.P[state][action]:
           probability, next_state, reward = option
-          Weighted_Rewards += probability  * reward 
-          Weighted_Value += probability  * gamma * vpi[next_state] 
+          Weighted_Rewards += probability  * reward
+          Weighted_Value += probability  * gamma * vpi[next_state]
         Qpi[state][action] = Weighted_Rewards + Weighted_Value
     return Qpi
 
@@ -136,5 +136,5 @@ plt.xticks(np.arange(0, 21, 1))
 plt.legend()
 plt.xlabel("Iterations")
 plt.ylabel("Value")
-plt.title("Value Iteration Progress for Each State")
+plt.title("Policy Iteration Progress for Each State")
 plt.show()
