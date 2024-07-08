@@ -63,20 +63,15 @@ print("")
 
 def compute_vpi(pi, mdp, gamma):
     # use pi[state] to access the action that's prescribed by this policy
-    V = np.ones(mdp.nS) # REPLACE THIS LINE WITH YOUR CODE
-    #V = gamma * mdp.P
-    dict = {}
-    Rewards = np.zeros(mdp.nS, mdp.nS)
-    Probability = np.zeros(mdp.nS, mdp.nS)
+    Weighted_Rewards = np.zeros(mdp.nS)
+    Probability = np.zeros((mdp.nS, mdp.nS))
     for state in range(mdp.nS):
       action = pi[state]
       for option in mdp.P[state][action]:
          probability, next_state, reward = option
-         Rewards[state][next_state] = reward
+         Weighted_Rewards[next_state] += probability  * reward 
          Probability[state][next_state] += probability
-
-
-    print(mdp.P[0])
+    V = np.linalg.solve((np.identity(mdp.nS) - gamma * Probability), Weighted_Rewards)
     return V
 """
               value_per_action = 0
@@ -86,9 +81,6 @@ def compute_vpi(pi, mdp, gamma):
 """
 
 
-
-
-
 actual_val = compute_vpi(np.arange(16) % mdp.nA, mdp, gamma=GAMMA)
 print("Policy Value: ", actual_val)
 
@@ -96,11 +88,20 @@ print("Policy Value: ", actual_val)
 # Programing Question No. 2, part 2 - implement where required.
 
 def compute_qpi(vpi, mdp, gamma):
-    Qpi = np.zeros([mdp.nS, mdp.nA]) # REPLACE THIS LINE WITH YOUR CODE
+    Qpi = np.zeros([mdp.nS, mdp.nA])
+    for state in range(mdp.nS):
+      for action in range(mdp.nA):
+        Weighted_Rewards = 0
+        Weighted_Value = 0
+        for option in mdp.P[state][action]:
+          probability, next_state, reward = option
+          Weighted_Rewards += probability  * reward 
+          Weighted_Value += probability  * gamma * vpi[next_state] 
+        Qpi[state][action] = Weighted_Rewards + Weighted_Value
     return Qpi
 
 Qpi = compute_qpi(np.arange(mdp.nS), mdp, gamma=0.95)
-print("Policy Action Value: ", actual_val)
+print("Policy Action Value: ", Qpi)
 
 #################################
 # Programing Question No. 2, part 3 - implement where required.
@@ -114,8 +115,8 @@ def policy_iteration(mdp, gamma, nIt):
     print("Iteration | # chg actions | V[0]")
     print("----------+---------------+---------")
     for it in range(nIt):
-        # YOUR CODE HERE
-        # you need to compute qpi which is the state-action values for current pi
+        vpi = compute_vpi(pi_prev, mdp, gamma)
+        qpi = compute_qpi(vpi, mdp, gamma)
         pi = qpi.argmax(axis=1)
         print("%4i      | %6i        | %6.5f"%(it, (pi != pi_prev).sum(), vpi[0]))
         Vs.append(vpi)
@@ -123,6 +124,17 @@ def policy_iteration(mdp, gamma, nIt):
         pi_prev = pi
     return Vs, pis
 
-
 Vs_PI, pis_PI = policy_iteration(mdp, gamma=0.95, nIt=20)
-plt.plot(Vs_PI);
+
+plt.figure(figsize=(12, 8))
+
+for i in range(16):
+    values = [Vs_PI[j][i] for j in range(20)]
+    plt.plot(values, label=f"State {i}")
+plt.xticks(np.arange(0, 21, 1))
+
+plt.legend()
+plt.xlabel("Iterations")
+plt.ylabel("Value")
+plt.title("Value Iteration Progress for Each State")
+plt.show()
