@@ -98,7 +98,7 @@ display_started = min_trial_length_to_start_display == 0
 NUM_STATES = 163
 NUM_ACTIONS = 2
 GAMMA = 0.995
-TOLERANCE = 0.01
+TOLERANCE = 0.0001
 NO_LEARNING_THRESHOLD = 20
 
 # Time cycle of the simulation
@@ -111,7 +111,7 @@ num_failures = 0
 time_at_start_of_current_trial = 0
 
 # You should reach convergence well before this
-max_failures = 500
+max_failures = 100
 
 # Initialize a cart pole
 cart_pole = CartPole(Physics())
@@ -124,8 +124,8 @@ state_tuple = (x, x_dot, theta, theta_dot)
 # `state` is the number given to this state, you only need to consider
 # this representation of the state
 state = cart_pole.get_state(state_tuple)
-# if min_trial_length_to_start_display == 0 or display_started == 1:
-#     cart_pole.show_cart(state_tuple, pause_time)
+if min_trial_length_to_start_display == 0 or display_started == 1:
+    cart_pole.show_cart(state_tuple, pause_time)
 
 # Perform all your initializations here:
 # Assume no transitions or rewards have been observed.
@@ -138,8 +138,52 @@ state = cart_pole.get_state(state_tuple)
 
 ###### BEGIN YOUR CODE ######
 # TODO:
-raise NotImplementedError('Initializations not implemented')
-###### END YOUR CODE ######
+class MDP(object):
+    def __init__(self, P0, P1, R, nS, nA, T0 = None, T1 = None, State_counter = None,  Total_R = None):
+        self.P0 = P0 # state transition and reward probabilities, explained below
+        self.P1 = P1
+        self.R = R
+        self.nS = nS # number of states
+        self.nA = nA # number of actions
+        self.T0 = np.zeros((self.nS, self.nS))
+        self.T1 = np.zeros((self.nS, self.nS))
+        self.State_counter = np.zeros((self.nS, self.nA))
+        self.Total_R = np.zeros(self.nS)
+
+
+    def Update_T(self, state, action, new_state):
+        if action == 0:
+            self.T0[state][new_state] += 1
+        if action == 1:
+            self.T1[state][new_state] += 1
+
+    def Update_P(self):
+        for state in range(self.nS):
+            if self.State_counter[state][0] != 0:
+                self.P0[state] = self.T0[state] / self.State_counter[state][0]
+            if self.State_counter[state][1] != 0:
+                self.P1[state] = self.T1[state] / self.State_counter[state][1]
+
+            # Ensure probabilities sum to 1
+            self.P0[state] /= self.P0[state].sum() if self.P0[state].sum() > 0 else 1
+            self.P1[state] /= self.P1[state].sum() if self.P1[state].sum() > 0 else 1
+
+    def Update_R(self):
+        for state in range(self.nS):
+            if self.State_counter[state].sum() != 0:
+                self.R[state] = self.Total_R[state] / self.State_counter[state].sum()
+            else:
+                self.R[state] = 0
+
+normalizing_factor = 1 / NUM_STATES
+P0 = normalizing_factor * np.ones((NUM_STATES, NUM_STATES))
+P1 = normalizing_factor * np.ones((NUM_STATES, NUM_STATES))
+Rewards = np.zeros(NUM_STATES)
+Estimated_mdp = MDP(P0, P1, Rewards, NUM_STATES, NUM_ACTIONS)
+
+Values = np.random.uniform(low=0, high=0.001, size=(NUM_STATES,))
+
+# ###### END YOUR CODE ######
 
 # This is the criterion to end the simulation.
 # You should change it to terminate when the previous
@@ -159,22 +203,28 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
     # model.
     ###### BEGIN YOUR CODE ######
     # TODO:
-    # raise NotImplementedError('Action choice not implemented')
-    # action = 0 if np.random.uniform() < 0.5 else 1
+    state = cart_pole.get_state(state_tuple)
+    op1_tuple = cart_pole.simulate(0, state_tuple)
+    op1_state = cart_pole.get_state(op1_tuple)
+    op2_tuple = cart_pole.simulate(1, state_tuple)
+    op2_state = cart_pole.get_state(op2_tuple)
+
+    action = np.argmax([np.sum(Estimated_mdp.P0[state] * Values), np.sum(Estimated_mdp.P1[state] * Values)])
+
     ###### END YOUR CODE ######
 
     # Get the next state by simulating the dynamics
     state_tuple = cart_pole.simulate(action, state_tuple)
-    # x, x_dot, theta, theta_dot = state_tuple
+    x, x_dot, theta, theta_dot = state_tuple
 
     # Increment simulation time
     time = time + 1
 
     # Get the state number corresponding to new state vector
     new_state = cart_pole.get_state(state_tuple)
-    # if display_started == 1:
-    #     cart_pole.show_cart(state_tuple, pause_time)
-
+    """if display_started == 1:
+        cart_pole.show_cart(state_tuple, pause_time)
+"""
     # reward function to use - do not change this!
     if new_state == NUM_STATES - 1:
         R = -1
@@ -191,10 +241,14 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
     ###### BEGIN YOUR CODE ######
     # TODO:
-    raise NotImplementedError('Update T and R not implemented')
     # record the number of times `state, action, new_state` occurs
-    # record the rewards for every `new_state`
+    Estimated_mdp.Update_T(state, action, new_state)
+
     # record the number of time `new_state` was reached
+    Estimated_mdp.State_counter[state][action] += 1
+
+    # record the rewards for every `new_state`
+    Estimated_mdp.Total_R[new_state] += R
     ###### END YOUR CODE ######
 
     # Recompute MDP model whenever pole falls
@@ -210,7 +264,8 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
         ###### BEGIN YOUR CODE ######
         # TODO:
-        raise NotImplementedError('MDP  T and R update not implemented')
+        Estimated_mdp.Update_R()
+        Estimated_mdp.Update_P()
         ###### END YOUR CODE ######
 
         # Perform value iteration using the new estimated model for the MDP.
@@ -221,7 +276,26 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
         ###### BEGIN YOUR CODE ######
         # TODO:
-        raise NotImplementedError('Value iteration choice not implemented')
+        vprev = Values.copy()
+        for state in range(Estimated_mdp.nS):
+            value_options = [0, 0]
+            for action in range(Estimated_mdp.nA):
+                if action == 0:
+                    probability = Estimated_mdp.P0[state]
+                if action == 1:
+                    probability = Estimated_mdp.P1[state]
+
+                Reward = Estimated_mdp.R[state]
+                value_options[action] = np.sum(probability * (Reward + GAMMA * (vprev)))
+            Values[state] = max(value_options)
+            #print(Values[68])
+        max_diff = np.abs(Values - vprev).max()
+        print(max_diff)
+        if max_diff <= TOLERANCE:
+            consecutive_no_learning_trials += 1
+        else:
+            consecutive_no_learning_trials = 0
+
         ###### END YOUR CODE ######
 
     # Do NOT change this code: Controls the simulation, and handles the case
