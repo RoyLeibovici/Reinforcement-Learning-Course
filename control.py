@@ -98,7 +98,7 @@ display_started = min_trial_length_to_start_display == 0
 NUM_STATES = 163
 NUM_ACTIONS = 2
 GAMMA = 0.995
-TOLERANCE = 0.0001
+TOLERANCE = 1.2 * 10**-4
 NO_LEARNING_THRESHOLD = 20
 
 # Time cycle of the simulation
@@ -111,7 +111,7 @@ num_failures = 0
 time_at_start_of_current_trial = 0
 
 # You should reach convergence well before this
-max_failures = 100
+max_failures = 500
 
 # Initialize a cart pole
 cart_pole = CartPole(Physics())
@@ -138,6 +138,7 @@ if min_trial_length_to_start_display == 0 or display_started == 1:
 
 ###### BEGIN YOUR CODE ######
 # TODO:
+# class for the MDP
 class MDP(object):
     def __init__(self, P0, P1, R, nS, nA, T0 = None, T1 = None, State_counter = None,  Total_R = None):
         self.P0 = P0 # state transition and reward probabilities, explained below
@@ -150,13 +151,14 @@ class MDP(object):
         self.State_counter = np.zeros((self.nS, self.nA))
         self.Total_R = np.zeros(self.nS)
 
-
+    # T0 and T1 are matrices which count transitions from [state] to [new_state] given action 0/1
     def Update_T(self, state, action, new_state):
         if action == 0:
             self.T0[state][new_state] += 1
         if action == 1:
             self.T1[state][new_state] += 1
 
+    # the transition matrix (P) is approximated by the ratio between the number of times a state has been visited to the total number of visits
     def Update_P(self):
         for state in range(self.nS):
             if self.State_counter[state][0] != 0:
@@ -168,6 +170,7 @@ class MDP(object):
             self.P0[state] /= self.P0[state].sum() if self.P0[state].sum() > 0 else 1
             self.P1[state] /= self.P1[state].sum() if self.P1[state].sum() > 0 else 1
 
+    # The reward per state is also approximated by the average value of rewards
     def Update_R(self):
         for state in range(self.nS):
             if self.State_counter[state].sum() != 0:
@@ -175,14 +178,15 @@ class MDP(object):
             else:
                 self.R[state] = 0
 
+# initialize the MDP
 normalizing_factor = 1 / NUM_STATES
 P0 = normalizing_factor * np.ones((NUM_STATES, NUM_STATES))
 P1 = normalizing_factor * np.ones((NUM_STATES, NUM_STATES))
 Rewards = np.zeros(NUM_STATES)
 Estimated_mdp = MDP(P0, P1, Rewards, NUM_STATES, NUM_ACTIONS)
 
-Values = np.random.uniform(low=0, high=0.001, size=(NUM_STATES,))
-
+# initialize Value vector
+Values = np.random.normal(loc=1e-4, scale=0.7e-1, size=NUM_STATES)
 # ###### END YOUR CODE ######
 
 # This is the criterion to end the simulation.
@@ -203,6 +207,7 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
     # model.
     ###### BEGIN YOUR CODE ######
     # TODO:
+    #Choose an action by expected value
     state = cart_pole.get_state(state_tuple)
     op1_tuple = cart_pole.simulate(0, state_tuple)
     op1_state = cart_pole.get_state(op1_tuple)
@@ -222,9 +227,11 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
     # Get the state number corresponding to new state vector
     new_state = cart_pole.get_state(state_tuple)
-    """if display_started == 1:
+    """"
+    if display_started == 1:
         cart_pole.show_cart(state_tuple, pause_time)
-"""
+        """
+
     # reward function to use - do not change this!
     if new_state == NUM_STATES - 1:
         R = -1
@@ -252,7 +259,7 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
     ###### END YOUR CODE ######
 
     # Recompute MDP model whenever pole falls
-    # Compute the value function V for the new model
+    # Compute the value function V for the new model when an episode ends
     if new_state == NUM_STATES - 1:
 
         # Update MDP model using the current accumulated statistics about the
@@ -264,6 +271,7 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
         ###### BEGIN YOUR CODE ######
         # TODO:
+        # Update reward and transition matrices
         Estimated_mdp.Update_R()
         Estimated_mdp.Update_P()
         ###### END YOUR CODE ######
@@ -276,6 +284,7 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
 
         ###### BEGIN YOUR CODE ######
         # TODO:
+        # Run Value iteration algorithm to derive a better policy in the next episode
         vprev = Values.copy()
         for state in range(Estimated_mdp.nS):
             value_options = [0, 0]
@@ -288,9 +297,7 @@ while consecutive_no_learning_trials < NO_LEARNING_THRESHOLD:
                 Reward = Estimated_mdp.R[state]
                 value_options[action] = np.sum(probability * (Reward + GAMMA * (vprev)))
             Values[state] = max(value_options)
-            #print(Values[68])
         max_diff = np.abs(Values - vprev).max()
-        print(max_diff)
         if max_diff <= TOLERANCE:
             consecutive_no_learning_trials += 1
         else:
@@ -329,6 +336,7 @@ w = np.array([1/window for _ in range(window)])
 weights = lfilter(w, 1, log_tstf)
 x = np.arange(window//2, len(log_tstf) - window//2)
 plt.plot(x, weights[window:len(log_tstf)], 'r--')
+plt.title('Number of Steps to failure as a function of Episodes')
 plt.xlabel('Num failures')
 plt.ylabel('Num steps to failure')
 plt.show()
